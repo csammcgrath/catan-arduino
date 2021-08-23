@@ -205,23 +205,23 @@ void loop() {
     }
     
     pixels.show();
+  }
 
-    bool newSwitchValue = digitalRead(SWITCH_PIN);
+  bool newSwitchValue = digitalRead(SWITCH_PIN);
 
-    // user pressed button
-    if (newSwitchValue != shuffleButton) {
-      shuffleButton = newSwitchValue;
-      shuffleBoard();
-      storeGame();
-      readGame();
-    }
+  // user pressed button
+  if (newSwitchValue != shuffleButton) {
+    shuffleButton = newSwitchValue;
+    shuffleBoard();
+    storeGame();
+    readGame();
+  }
 
-    // check timer
-    if (millis() - lastLoopMilli >= TIME_SWITCH_BOARD) {
-       shuffleBoard();
-       storeGame();
-       readGame();
-    }
+  // check timer
+  if (millis() - lastLoopMilli >= TIME_SWITCH_BOARD) {
+     shuffleBoard();
+     storeGame();
+     readGame();
   }
   
   delay(DELAY_VALUE);
