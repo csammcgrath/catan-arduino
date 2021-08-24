@@ -243,6 +243,9 @@ Catan catan;
 
 int buttonState = 0;
 
+/**
+ * Setting up the game through the led strip
+ */
 void setupGame() {
   for (int i = 0; i < NUMPIXELS; i++) {
     int colorIndex = i / 3;
@@ -250,6 +253,7 @@ void setupGame() {
 
     // ports
     if (i > 56) {
+      // "reset" index ot 0 to follow the port array
       colorIndex = i - 57;
       color = catan.ports.at(colorIndex);
     }
