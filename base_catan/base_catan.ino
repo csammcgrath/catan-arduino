@@ -1,15 +1,4 @@
-/**
- * Author's TODO:
- * 
- * [X]: Refactor program
- * [X]: Add/cleanup comments
- * [X]: Fix game flow (reduce EEPROM storage/reads)
- * [X]: Possibly convert the resources into structs (this will probably require a major refactor)
- * [ ]: Test out with LED strip and ensure that everything is working as expected
- */
-
 #include <Adafruit_NeoPixel.h>    // handle individually addressable LEDs
-#include <EEPROM.h>               // used for persisting game state when turned off
 #include <time.h>                 // for srand (seed for randomization)
 #include <Array.h>                // Arrays (documentation: https://github.com/janelia-arduino/Array)
 
@@ -17,9 +6,8 @@
 #define NUMPIXELS 66              // 57 for resource tiles and 9 for ports
 
 #define DELAY_VALUE 50            // time (ms) to pause between re-rendering the LEDs
-#define TIME_SWITCH_BOARD 300000  // time (ms) to switch board
 
-#define SWITCH_PIN 7              // randomizer button/switch is on this pin
+#define BUTTON_PIN 7              // randomizer button/switch is on this pin
 
 /**
  * We may handle multiple "games" (5/6 players, Seafarers, C&K, etc) 
@@ -44,6 +32,7 @@ unsigned int lastLoopMilli = 0;
  */
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
+boolean oldButtonState = HIGH;
 
 //////////////////////////////////////////////////////////////
 // ABSTRACT CLASSES
@@ -72,52 +61,45 @@ typedef struct rgb RGB;
 //////////////////////////////////////////////////////////////
 
 struct brick {
-  brick() : rgb(169, 17, 1), isHidden(false) {};
+  brick() : rgb(169, 17, 1) {};
 
   RGB rgb;
-  bool isHidden;
 };
 
 struct wheat {
-  wheat() : rgb(254, 223, 0), isHidden(false) {};
+  wheat() : rgb(254, 223, 0) {};
 
   RGB rgb;
-  bool isHidden;
 };
 
 struct ore {
-  ore() : rgb(157, 157, 157), isHidden(false) {};
+  ore() : rgb(25, 25, 150) {};
 
   RGB rgb;
-  bool isHidden;
 };
 
 struct sheep {
-  sheep() : rgb(152, 251, 152), isHidden(false) {};
+  sheep() : rgb(0, 200, 20) {};
 
   RGB rgb;
-  bool isHidden;
 };
 
 struct wood {
-  wood() : rgb(0, 168, 119), isHidden(false) {};
+  wood() : rgb(0, 255, 0) {};
 
   RGB rgb;
-  bool isHidden;
 };
 
 struct desert {
-  desert() : rgb(243, 180, 139), isHidden(false) {};
+  desert() : rgb(153, 76, 0) {};
 
   RGB rgb;
-  bool isHidden;
 };
 
 struct port {
-  port() : rgb(255, 255, 255), isHidden(false) {};
+  port() : rgb(255, 255, 255) {};
 
   RGB rgb;
-  bool isHidden;
 };
 
 /**
@@ -141,48 +123,27 @@ struct catan {
   Array<int, BASE_PORT_SIZE> ports = {{ 0, 1, 2, 3, 4, 6, 6, 6, 6 }};
   Array<int, BASE_RESOURCE_SIZE> resources = {{ 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5 }};
 
-  /**
-   * shuffleBoard()
-   * 
-   * Main driver behind shuffling and storing updated locations in EEPROM
-   */
-  void shuffleBoard() {
-    randomSeed(analogRead(A0));
-    shuffleTiles();
-    storeGame();
-  }
-
-  /**
-   * Shuffle all of the tiles :)
-   */
-  void shuffleTiles() {
-    randomize();
-  }
-
-  /**
-   * @param vals[] <int[]> - array to be shuffled
-   * @param n <int> - length of array because C++ sucks and doesn't store array size
-   * Randomizer that takes in an array
-   * 
+  /*
    * Note to reader:
    * The `srand(time(NULL))` basically uses the internal clock to control the seed,
    * which is the starting value. For more information regarding this and why I'm 
    * approaching this as the way, please see:
    * https://mathbits.com/MathBits/CompSci/LibraryFunc/rand.htm
    */
-  void randomize() {
-    srand(time(NULL)); // uses the internal clock to control the seed
+  void shuffleBoard() {
+    randomSeed(analogRead(A0));
   
-    for (int i = 0; i < BASE_RESOURCE_SIZE - 1; i++) {
-      int j = rand() % (i + 1);
+    for (int i = 0; i < BASE_RESOURCE_SIZE; i++) {
+      int j = random(0, BASE_RESOURCE_SIZE);
   
       swap(&resources.at(i), &resources.at(j));
     }
 
-    for (int i = 0; i < BASE_PORT_SIZE - 1; i++) {
-      int j = rand() % (i + 1);
+    randomSeed(analogRead(A0));
+    for (int i = 0; i < BASE_PORT_SIZE; i++) {
+      int j = random(0, BASE_PORT_SIZE);
   
-      swap(&resources.at(i), &resources.at(j));
+      swap(&ports.at(i), &ports.at(j));
     }
   }
   
@@ -195,37 +156,6 @@ struct catan {
     int temp = *first; // save first value
     *first = *second;
     *second = temp;
-  }
-  
-  /**
-   * Stores the game into EEPROM just in case if someone bumps the plug
-   * 
-   * Note to reader: This function as well as readGame() used to use this
-   * technique: https://roboticsbackend.com/arduino-store-int-into-eeprom/.
-   * 
-   * I'm not a huge fan of bitwise "magic" even though there's a cost in 
-   * performance for doing that. I prefer to take a hit to performance for 
-   * the returns in readability. I expect to come back to this in a few weeks/months 
-   * to add support for other expansions.
-   */
-  void storeGame() {
-    int resourceOffset = 0;
-    int portOffset = sizeof(resources);
-  
-    EEPROM.put(resourceOffset, resources);
-    EEPROM.put(portOffset, ports);
-  }
-  
-  /**
-   * Please refer to storeGame() block comments for more information
-   * regarding this function.
-   */
-  void readGame() {
-    int resourceOffset = 0;
-    int portOffset = sizeof(resources);
-  
-    EEPROM.get(resourceOffset, resources);
-    EEPROM.get(portOffset, ports);
   }
 };
 
@@ -247,7 +177,7 @@ int buttonState = 0;
  * Setting up the game through the led strip
  */
 void setupGame() {
-  for (int i = 0; i < NUMPIXELS; i++) {
+  for (int i = 0; i < pixels.numPixels(); i++) {
     int colorIndex = i / 3;
     int color = catan.resources.at(colorIndex);
 
@@ -291,9 +221,9 @@ void setupGame() {
  * Initialization
  */
 void setup() {
-  pinMode(SWITCH_PIN, INPUT);
-  buttonState = digitalRead(SWITCH_PIN);
-  catan.readGame();
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+
+  // Signify to the user that the game is ready to be created
   pixels.begin(); 
 }
 
@@ -304,18 +234,21 @@ void setup() {
  * DELAY_VALUE global variable. 
  */
 void loop() {
-  setupGame();
-  
-  buttonState = digitalRead(SWITCH_PIN);
+  boolean newButtonState = digitalRead(BUTTON_PIN);
 
   // user pressed button
-  if (buttonState == HIGH) {
-    catan.shuffleBoard();
-  }
+  if (newButtonState == LOW && oldButtonState == HIGH) {
+    //short delay to debounce button 
+    delay(20);
 
-  // check timer
-  if (millis() - lastLoopMilli >= TIME_SWITCH_BOARD) {
-     catan.shuffleBoard();
+    // double check to see if button is still low after debounce
+    newButtonState = digitalRead(BUTTON_PIN);
+
+    // The user has truly pushed the button
+    if (newButtonState == LOW) {
+      catan.shuffleBoard();
+      setupGame();
+    }
   }
   
   delay(DELAY_VALUE);
