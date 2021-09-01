@@ -6,7 +6,7 @@
 #define NUMPIXELS 66              // 57 for resource tiles and 9 for ports
 
 #define DELAY_VALUE 50            // time (ms) to pause between re-rendering the LEDs
-
+#define SHUFFLE_TIMES_NUM 5       // Shuffle board 8 times to produce "loading" vibe
 #define BUTTON_PIN 7              // randomizer button/switch is on this pin
 
 /**
@@ -17,15 +17,6 @@
  */
 #define BASE_PORT_SIZE 9
 #define BASE_RESOURCE_SIZE 19
-
-/**
- * Global variable to store last time (in ms) we looped
- * 
- * This is for the game variant where the board shuffles 
- * every X milliseconds. This # of milliseconds is defined 
- * in TIME_SWITCH_BOARD (global variables)
- */
-unsigned int lastLoopMilli = 0;
 
 /**
  * Setting up NeoPixel library with # of pixels and pin
@@ -61,7 +52,7 @@ typedef struct rgb RGB;
 //////////////////////////////////////////////////////////////
 
 struct brick {
-  brick() : rgb(169, 17, 1) {};
+  brick() : rgb(255, 0, 0) {};
 
   RGB rgb;
 };
@@ -79,7 +70,7 @@ struct ore {
 };
 
 struct sheep {
-  sheep() : rgb(0, 200, 20) {};
+  sheep() : rgb(57,255,20) {};
 
   RGB rgb;
 };
@@ -91,7 +82,7 @@ struct wood {
 };
 
 struct desert {
-  desert() : rgb(153, 76, 0) {};
+  desert() : rgb(200, 76, 0) {};
 
   RGB rgb;
 };
@@ -246,8 +237,13 @@ void loop() {
 
     // The user has truly pushed the button
     if (newButtonState == LOW) {
-      catan.shuffleBoard();
-      setupGame();
+      
+
+      for (int i = 0; i < SHUFFLE_TIMES_NUM; i++) {
+        catan.shuffleBoard();
+        setupGame();
+        delay(125);
+      }
     }
   }
   
