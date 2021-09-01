@@ -237,7 +237,6 @@ void loop() {
 
     // The user has truly pushed the button
     if (newButtonState == LOW) {
-      
 
       for (int i = 0; i < SHUFFLE_TIMES_NUM; i++) {
         catan.shuffleBoard();
